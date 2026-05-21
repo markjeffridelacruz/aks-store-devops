@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: makeline-service
+  namespace: aks-store
+  labels:
+    app: makeline-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: makeline-service
+  template:
+    metadata:
+      labels:
+        app: makeline-service
+    spec:
+      initContainers:
+        - name: wait-for-rabbitmq
+          image: busybox:1.37
+          command:
+            - sh
+            - -c
+            - until nc -z rabbitmq 5672; do echo waiting for rabbitmq; sleep 2; done
+        - name: wait-for-mongodb
+          image: busybox:1.37
+          command:
+            - sh
+            - -c
+            - until nc -z mongodb 27017; do echo waiting for mongodb; sleep 2; done
+      containers:
+        - name: makeline-service
+          image: makeline-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3001
+          envFrom:
+            - configMapRef:
+                name: app-config
+          env:
+            - name: ORDER_QUEUE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: ORDER_QUEUE_USERNAME
+            - name: ORDER_QUEUE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: ORDER_QUEUE_PASSWORD
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 5
