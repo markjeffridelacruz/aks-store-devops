@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: ai-service
-          image: ai-service:latest
+          image: ghcr.io/markjeffridelacruz/aks-store-devops/ai-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5001

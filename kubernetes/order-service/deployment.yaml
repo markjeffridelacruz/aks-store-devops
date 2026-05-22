@@ -24,7 +24,7 @@ spec:
             - until nc -z rabbitmq 5672; do echo waiting for rabbitmq; sleep 2; done
       containers:
         - name: order-service
-          image: order-service:latest
+          image: ghcr.io/markjeffridelacruz/aks-store-devops/order-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000

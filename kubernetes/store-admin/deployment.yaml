@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: store-admin
-          image: store-admin:latest
+          image: ghcr.io/markjeffridelacruz/aks-store-devops/store-admin:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8081

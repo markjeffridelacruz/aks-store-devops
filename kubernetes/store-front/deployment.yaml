@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
         - name: store-front
-          image: store-front:latest
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/markjeffridelacruz/aks-store-devops/store-front:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           resources:

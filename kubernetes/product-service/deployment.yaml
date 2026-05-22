@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: product-service
-          image: product-service:latest
+          image: ghcr.io/markjeffridelacruz/aks-store-devops/product-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3002
