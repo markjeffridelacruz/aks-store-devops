@@ -18,6 +18,8 @@ on:
 env:
   AKS_STORE_DEMO_REPO: https://github.com/Azure-Samples/aks-store-demo.git
   AKS_STORE_DEMO_BRANCH: main
+  # Use Node 24 runtime for JavaScript-based Actions (checkout, setup-node, etc.)
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: read
@@ -28,12 +30,12 @@ jobs:
     name: Test frontend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Clone aks-store-demo
         run: git clone --depth 1 --branch "${{ env.AKS_STORE_DEMO_BRANCH }}" "${{ env.AKS_STORE_DEMO_REPO }}" aks-store-demo
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "20"
 
@@ -52,12 +54,12 @@ jobs:
     name: Test backend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Clone aks-store-demo
         run: git clone --depth 1 --branch "${{ env.AKS_STORE_DEMO_BRANCH }}" "${{ env.AKS_STORE_DEMO_REPO }}" aks-store-demo
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "20"
 
@@ -114,7 +116,7 @@ jobs:
           - makeline-service
           - ai-service
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Clone aks-store-demo
         run: git clone --depth 1 --branch "${{ env.AKS_STORE_DEMO_BRANCH }}" "${{ env.AKS_STORE_DEMO_REPO }}" aks-store-demo
