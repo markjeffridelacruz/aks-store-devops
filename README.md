@@ -271,7 +271,7 @@ Workflows live under `.github/workflows/`:
 
 | Workflow | File | Purpose |
 |----------|------|---------|
-| **CI** | `.github/workflows/ci.yml` | Test apps, build images, push to GitHub Container Registry |
+| **CI** | `.github/workflows/ci.yml` | Build Docker images and push to GHCR |
 | **CD** | `.github/workflows/cd.yml` | Deploy Kubernetes manifests to AKS |
 
 ### GitHub setup (one-time)
@@ -322,22 +322,17 @@ Example: `ghcr.io/myuser/aks-store-devops/store-front:a1b2c3d`
 
 ### What CI does
 
-1. Clones [aks-store-demo](https://github.com/Azure-Samples/aks-store-demo) application source.
-2. **Tests** (on push and PR)
-   - Frontend: `store-front`, `store-admin` — type-check + Vitest
-   - `order-service` — npm/tap tests
-   - `makeline-service` — `go test`
-   - `product-service` — `cargo test`
-   - `ai-service` — Python compile check
-3. **Build & push** (push to `main` only, not PRs) — builds with `app/<service>/Dockerfile`, pushes to **GHCR**.
+1. Clones [aks-store-demo](https://github.com/Azure-Samples/aks-store-demo) source.
+2. Builds each service image with `app/<service>/Dockerfile`.
+3. **Push to GHCR** on `main` only (PRs build without pushing, to verify Dockerfiles).
 
 ### What CD does
 
-Runs after a successful **CI** workflow on `main`, or manually via **workflow_dispatch**:
+Runs after a successful **CI** on `main`, or manually via **workflow_dispatch**:
 
-1. Patches deployment images to `ghcr.io/<owner>/<repo>/<service>:<tag>`.
-2. Applies all `kubernetes/` manifests to namespace `aks-store`.
-3. Waits for each application rollout.
+1. Patches deployment images to GHCR tags.
+2. Applies all `kubernetes/` manifests.
+3. Waits for rollouts to finish.
 
 ### Manual CD run
 

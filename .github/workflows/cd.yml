@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: "Image tag to deploy (7-char git SHA from CI)"
+        description: "Image tag (7-char git SHA from CI, or latest)"
         required: true
         default: "latest"
 
@@ -17,7 +17,7 @@ permissions:
   id-token: write
 
 jobs:
-  deploy-aks:
+  deploy:
     name: Deploy to AKS
     runs-on: ubuntu-latest
     if: >
@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Set image tag and registry
+      - name: Set image tag
         run: |
           echo "IMAGE_PREFIX=ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -35,56 +35,29 @@ jobs:
           else
             echo "IMAGE_TAG=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)" >> "$GITHUB_ENV"
           fi
-          echo "Deploying images: ${IMAGE_PREFIX}/*:${IMAGE_TAG}"
 
-      - name: Patch Kubernetes deployment images
+      - name: Prepare manifests
         run: |
-          set -e
           K8S_DIR="${RUNNER_TEMP}/kubernetes"
           cp -r kubernetes "$K8S_DIR"
-          cd "$K8S_DIR"
           for svc in store-front store-admin order-service product-service makeline-service ai-service; do
             sed -i "s|image: ${svc}:latest|image: ${IMAGE_PREFIX}/${svc}:${IMAGE_TAG}|g" \
-              "${svc}/deployment.yaml"
+              "$K8S_DIR/${svc}/deployment.yaml"
           done
-          echo "=== Patched images ==="
-          grep -h "image:" */deployment.yaml | grep -v mongo | grep -v rabbitmq
+          echo "K8S_DIR=$K8S_DIR" >> "$GITHUB_ENV"
 
-      - name: Azure login
-        uses: azure/login@v2
+      - uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Set AKS context
-        uses: azure/aks-set-context@v4
+      - uses: azure/aks-set-context@v4
         with:
           cluster-name: ${{ vars.AKS_CLUSTER_NAME }}
           resource-group: ${{ vars.AZURE_RESOURCE_GROUP }}
-          admin: "false"
-          use-kubelogin: "true"
+          use-kubelogin: true
 
-      - name: Apply namespace and configuration
-        run: |
-          kubectl apply -f "${RUNNER_TEMP}/kubernetes/namespace.yaml"
-          kubectl apply -f "${RUNNER_TEMP}/kubernetes/configmaps/"
-          kubectl apply -f "${RUNNER_TEMP}/kubernetes/secrets/"
-
-      - name: Apply infrastructure
-        run: |
-          kubectl apply -f "${RUNNER_TEMP}/kubernetes/mongodb/"
-          kubectl apply -f "${RUNNER_TEMP}/kubernetes/rabbitmq/"
-
-      - name: Apply applications
-        run: |
-          kubectl apply -f "${RUNNER_TEMP}/kubernetes/order-service/"
-          kubectl apply -f "${RUNNER_TEMP}/kubernetes/makeline-service/"
-          kubectl apply -f "${RUNNER_TEMP}/kubernetes/product-service/"
-          kubectl apply -f "${RUNNER_TEMP}/kubernetes/ai-service/"
-          kubectl apply -f "${RUNNER_TEMP}/kubernetes/store-front/"
-          kubectl apply -f "${RUNNER_TEMP}/kubernetes/store-admin/"
-
-      - name: Apply ingress
-        run: kubectl apply -f "${RUNNER_TEMP}/kubernetes/ingress/"
+      - name: Deploy to cluster
+        run: kubectl apply -f "${K8S_DIR}" --recursive
 
       - name: Wait for rollouts
         run: |
