@@ -4,7 +4,7 @@ metadata:
   name: aks-store-ingress
   namespace: aks-store
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   ingressClassName: nginx
   rules:

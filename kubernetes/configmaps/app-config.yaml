@@ -20,7 +20,3 @@ data:
   ORDER_SERVICE_URL: http://order-service:3000/
   PRODUCT_SERVICE_URL: http://product-service:3002/
   MAKELINE_SERVICE_URL: http://makeline-service:3001
-  AI_SERVICE_URL: http://ai-service:5001/
-
-  # ai-service (aligned with docker-compose; set secrets for API keys)
-  USE_AZURE_OPENAI: "True"
