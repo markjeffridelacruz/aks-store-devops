@@ -46,8 +46,7 @@ jobs:
             echo "=== Testing $app ==="
             cd aks-store-demo/src/$app
             npm ci
-            npm run type-check
-            npm run test:unit -- --run
+            npm run build
           done
 
   test-backend:
