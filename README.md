@@ -20,6 +20,7 @@ aks-store-devops/
 ├── app/                    # Dockerfiles (one per service)
 ├── docker-compose.yml      # Full stack for local development
 ├── rabbitmq_enabled_plugins
+├── .github/workflows/      # GitHub Actions CI/CD (ci.yml, cd.yml)
 ├── kubernetes/             # Manifests (Deployments, Services, Ingress, etc.)
 │   ├── namespace.yaml
 │   ├── configmaps/
@@ -184,7 +185,7 @@ eval $(minikube docker-env)
 # rebuild images here so they exist inside minikube
 ```
 
-**AKS** — push to Azure Container Registry and set image names in deployments (e.g. `myacr.azurecr.io/store-front:v1`).
+**AKS** — images are built by GitHub Actions and pushed to GHCR; CD patches deployments automatically (see [CI/CD](#cicd-github-actions--ghcr)).
 
 ### 2. Install an Ingress controller (for HTTP routing)
 
@@ -264,6 +265,86 @@ kubectl delete namespace aks-store
 
 ---
 
+## CI/CD (GitHub Actions + GHCR)
+
+Workflows live under `.github/workflows/`:
+
+| Workflow | File | Purpose |
+|----------|------|---------|
+| **CI** | `.github/workflows/ci.yml` | Test apps, build images, push to GitHub Container Registry |
+| **CD** | `.github/workflows/cd.yml` | Deploy Kubernetes manifests to AKS |
+
+### GitHub setup (one-time)
+
+1. **Enable Actions** on your repository (Settings → Actions → General).
+
+2. **Package permissions** — CI uses `GITHUB_TOKEN` to push to `ghcr.io`. For private repos, ensure workflow permissions allow **Read and write** for packages (Settings → Actions → General → Workflow permissions).
+
+3. **Repository variables** (Settings → Secrets and variables → Actions → Variables) for CD:
+
+   | Variable | Example | Required |
+   |----------|---------|----------|
+   | `AKS_CLUSTER_NAME` | `aks-store-cluster` | CD |
+   | `AZURE_RESOURCE_GROUP` | `rg-aks-store` | CD |
+
+4. **Repository secret** for CD:
+
+   | Secret | Description |
+   |--------|-------------|
+   | `AZURE_CREDENTIALS` | JSON service principal with access to AKS ([create with `az ad sp create-for-rbac`](https://github.com/azure/login#login-with-a-service-principal-secret)) |
+
+5. **GitHub environment** (optional) — create environment `aks-store` for deployment approvals (Settings → Environments).
+
+6. **Pull images on AKS** — if packages are private, create an image pull secret in the cluster:
+
+   ```bash
+   kubectl create secret docker-registry ghcr-secret \
+     --docker-server=ghcr.io \
+     --docker-username=<github-username> \
+     --docker-password=<github-pat-with-read:packages> \
+     -n aks-store
+   ```
+
+   Then add `imagePullSecrets: [{ name: ghcr-secret }]` to application deployments, or link AKS to pull public GHCR packages.
+
+7. **App secrets** — set real values in `kubernetes/secrets/app-secrets.yaml` before production use.
+
+### Image naming (GHCR)
+
+Images are pushed as:
+
+```text
+ghcr.io/<github-owner>/<repo>/<service>:<7-char-sha>
+ghcr.io/<github-owner>/<repo>/<service>:latest
+```
+
+Example: `ghcr.io/myuser/aks-store-devops/store-front:a1b2c3d`
+
+### What CI does
+
+1. Clones [aks-store-demo](https://github.com/Azure-Samples/aks-store-demo) application source.
+2. **Tests** (on push and PR)
+   - Frontend: `store-front`, `store-admin` — type-check + Vitest
+   - `order-service` — npm/tap tests
+   - `makeline-service` — `go test`
+   - `product-service` — `cargo test`
+   - `ai-service` — Python compile check
+3. **Build & push** (push to `main` only, not PRs) — builds with `app/<service>/Dockerfile`, pushes to **GHCR**.
+
+### What CD does
+
+Runs after a successful **CI** workflow on `main`, or manually via **workflow_dispatch**:
+
+1. Patches deployment images to `ghcr.io/<owner>/<repo>/<service>:<tag>`.
+2. Applies all `kubernetes/` manifests to namespace `aks-store`.
+3. Waits for each application rollout.
+
+### Manual CD run
+
+Actions → **CD** → Run workflow → enter the `image_tag` (7-character SHA from a CI run, or `latest`).
+
+---
+
 ## Troubleshooting
 
 | Issue | What to check |
@@ -272,7 +353,7 @@ kubectl delete namespace aks-store
 | RabbitMQ mount error | `rabbitmq_enabled_plugins` must be a **file**, not a directory |
 | `order-service` not running | RabbitMQ healthy? `docker compose logs rabbitmq` |
 | store-front / store-admin **unhealthy** | Rebuild after Dockerfile/nginx changes: `docker compose up -d --build store-front store-admin` |
-| Kubernetes `ImagePullBackOff` | Image not in cluster — load into kind/minikube or push to ACR |
+| Kubernetes `ImagePullBackOff` | Image not in cluster — verify GHCR package exists; add `imagePullSecrets` for private GHCR |
 | Ingress not reachable | Controller installed? `kubectl get ingress -n aks-store` |
 
 ---
